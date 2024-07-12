@@ -49,17 +49,20 @@ def save_prices_to_mongodb(data):
     today_date = datetime.now().strftime("%Y-%m-%d")
 
     # Process hourly prices
+    print("{")
     for hour_data in data['energy']['todayHours']:
         hour = hour_data['hour']
         price_incl_vat = hour_data['priceIncludingVat']
 
         # Generate datetime for each minute within this hour
-        for minute in range(60):
-            timestamp = datetime.strptime(f"{today_date} {hour}:{minute}", "%Y-%m-%d %H:%M")
+        for minute in range(0, 60, 5):
+            timestamp = datetime.strptime(f"{today_date} {hour}:{minute:02}", "%Y-%m-%d %H:%M")
             price_document = {
                 "$set": {"price": price_incl_vat}
             }
             collection.update_one({ "timestamp": timestamp}, price_document, upsert=True)
+            print(f'    "timestamp": {timestamp}, "price": {price_incl_vat:.4f},')
+    print("}")
     print(f"Successfully retrieved prices for {today_date}")
 
 
