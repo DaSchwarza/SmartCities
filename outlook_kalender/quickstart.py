@@ -1,14 +1,24 @@
 import datetime
 import os.path
+import json
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import paho.mqtt.client as mqtt
 
-# If modifying these scopes, delete the file token.json.
+# Source: https://developers.google.com/calendar/api/quickstart/python
+
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+
+# MQTT configuration
+MQTT_BROKER="167.172.166.109" 
+MQTT_PORT=1883
+MQTT_USER="local"
+MQTT_PASSWORD="Stuttgart"
+MQTT_TOPIC = "/standardized/calendar/events"
 
 def get_calendar_list(service):
     calendar_list = service.calendarList().list().execute()
@@ -17,13 +27,14 @@ def get_calendar_list(service):
     return calendar_dict
 
 def get_events(service, calendar_id, calendar_name):
-    now = datetime.datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
-    print(f"Getting all upcoming events for calendar: {calendar_name}")
+    now = datetime.datetime.utcnow().isoformat() + "Z"  
+    print(f"Getting the next 2 upcoming events for calendar: {calendar_name}")
     events_result = (
         service.events()
         .list(
             calendarId=calendar_id,
             timeMin=now,
+            maxResults=2,  
             singleEvents=True,
             orderBy="startTime",
         )
@@ -35,15 +46,31 @@ def get_events(service, calendar_id, calendar_name):
         print("No upcoming events found.")
         return
 
-    # Prints the start and end time of all upcoming events
+    events_data = []
     for event in events:
         start = event["start"].get("dateTime", event["start"].get("date"))
         end = event["end"].get("dateTime", event["end"].get("date"))
-        print(f"Start: {start}, End: {end}")
+        events_data.append({"start": start, "end": end})
+
+    # Publish events to MQTT
+    publish_events(calendar_name, events_data)
+
+def publish_events(calendar_name, events_data):
+    client = mqtt.Client()
+    client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    topic = MQTT_TOPIC + "/" + calendar_name
+
+    payload = json.dumps({
+        "events": events_data
+    })
+    client.publish(topic, payload)
+    client.disconnect()
+    print(f"Published events for calendar: {calendar_name}")
 
 def main():
     """Shows basic usage of the Google Calendar API.
-    Prints the start and end time of all upcoming events on the user's calendar.
+    Prints the start and end time of the next 2 upcoming events on the user's calendar.
     """
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -70,8 +97,7 @@ def main():
         # Get the list of calendars
         calendar_dict = get_calendar_list(service)
 
-        # Specify the calendar names you are interested in
-        calendar_names_of_interest = ["car 1", "car 2"]
+        calendar_names_of_interest = ["F-UN-404", "BI-ER-200"]
 
         for calendar_name in calendar_names_of_interest:
             if calendar_name in calendar_dict:
@@ -84,5 +110,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
