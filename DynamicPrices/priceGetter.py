@@ -8,26 +8,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def fetch_office_plz():
-    # Connect to MongoDB to retrieve configuration
-    mongo_uri = os.getenv("MONGO_URI")
-    database_name = os.getenv("CONFIGURATION_DATABASE")
-    collection_name = os.getenv("CONFIGURATION_COLLECTION")
-    client = pymongo.MongoClient(mongo_uri)
-    db = client[database_name]
-    config_collection = db[collection_name]
+def fetch_prices_from_api():
+    # Get today's date and time for 'start', and tomorrow's date and a specified end time for 'end'
+    now = datetime.utcnow()
+    start_date = now.strftime('%Y-%m-%dT02:00Z')  # Assuming prices start from 02:00 UTC of the current day
+    end_date = (now + timedelta(days=1)).strftime(
+        '%Y-%m-%dT21:00Z')  # Assuming you want to end at 20:00 UTC of the next day
 
-    # Fetch the office_plz configuration
-    config_data = config_collection.find_one({"variable": "office_plz"})
-    if not config_data:
-        print("Error retrieving office_plz")
-        return None
-    return config_data.get("value", "")
-
-
-def fetch_prices_from_api(office_plz):
-    # API URL for fetching data
-    api_url = f"https://tibber.com/de/api/lookup/price-overview?postalCode={office_plz}"
+    # Construct the API URL with dynamic start and end dates
+    api_url = f"https://api.energy-charts.info/price?bzn=DE-LU&start={start_date}&end={end_date}"
     response = requests.get(api_url)
 
     if response.status_code == 200:
@@ -46,34 +35,27 @@ def save_prices_to_mongodb(data):
     db = client[database_name]
     collection = db[collection_name]
 
-    today_date = datetime.now().strftime("%Y-%m-%d")
-
+    unix_seconds = data['unix_seconds']
+    prices = data['price']
     # Process hourly prices
-    print("{")
-    for hour_data in data['energy']['todayHours']:
-        hour = hour_data['hour']
-        price_incl_vat = hour_data['priceIncludingVat']
-
-        # Generate datetime for each minute within this hour
-        for minute in range(0, 60, 5):
-            timestamp = datetime.strptime(f"{today_date} {hour}:{minute:02}", "%Y-%m-%d %H:%M")
+    for unix_time, price in zip(unix_seconds, prices):
+        base_time = datetime.utcfromtimestamp(unix_time)
+        for minute in range(0, 60, 5):  # Generating entries for every 5 minutes
+            timestamp = base_time + timedelta(minutes=minute)
+            # convert price to EUR / KWH and add flat grid fees
+            kwh_price = price / 1000 + 0.2
+            formatted_timestamp = timestamp.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             price_document = {
-                "$set": {"price": price_incl_vat}
+                "timestamp":formatted_timestamp,
+                "price": kwh_price
             }
-            collection.update_one({ "timestamp": timestamp}, price_document, upsert=True)
-            print(f'    "timestamp": {timestamp}, "price": {price_incl_vat:.4f},')
-    print("}")
-    print(f"Successfully retrieved prices for {today_date}")
+            collection.insert_one(price_document)
+    print(f"Successfully retrieved prices")
 
 
 def main():
-    # Fetch office_plz from configuration
-    office_plz = fetch_office_plz()
-    if not office_plz:
-        print("office_plz configuration is missing, skipping ...")
-        return None
-    # Fetch prices from API with office_plz
-    price_data = fetch_prices_from_api(office_plz)
+    # Fetch prices from API
+    price_data = fetch_prices_from_api()
     if not price_data:
         print("No data fetched, skipping ...")
         return None

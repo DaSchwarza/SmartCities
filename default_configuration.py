@@ -1,4 +1,5 @@
 import os
+from bson import ObjectId
 import pymongo
 from dotenv import load_dotenv
 
@@ -36,40 +37,48 @@ def initialize_configurations():
 def initialize_entities():
     # Connect to MongoDB using environment variables
     db_name = os.getenv('KNOWLEDGE_DATABASE')
-    collection_name = os.getenv('DEVICE_COLLECTION')
     client = pymongo.MongoClient(mongo_uri)
     db = client[db_name]
-    device_collection = db[collection_name]
 
     # Default Devices
     # Insert Sensors
     sensors = [
-        {"id": 1, "mac_address": "00:11:22:33:44:55", "type": "parking_sensor"},
-        {"id": 2, "mac_address": "66:77:88:99:AA:BB", "type": "parking_sensor"}
+        {"_id": ObjectId("66910af0cd4ecc530d0c9bc8"), "alias": 1, "macAddress": "bef54ca19801", "type": "parking_sensor"},
+        {"_id": ObjectId("66910b021e707ca140dbaecf"), "alias": 2, "macAddress": "481930d7ba90", "type": "parking_sensor"}
     ]
+    sensorCollection = db["parkingsensors"]
+    sensorCollection.delete_many({})
+    sensorCollection.insert_many(sensors)
 
     # Insert Plugs
     plugs = [
-        {"id": 1, "mac_address": "00:11:22:33:44:56", "type": "smart_plug"},
-        {"id": 2, "mac_address": "66:77:88:99:AA:BC", "type": "smart_plug"}
+        {"_id": ObjectId("66910b1fa74174b0d5475cd2"), "alias": 1, "macAddress": "000D6F0005692B55"},
+        {"_id": ObjectId("66910b2657f3885d66106594"), "alias": 2, "macAddress": "000D6F0004B1E6C4"}
     ]
+    plugCollection = db["smartplugs"]
+    plugCollection.delete_many({})
+    plugCollection.insert_many(plugs)
 
     # Insert Parking Spaces
     parking_spaces = [
-        {"id": 1, "sensor_id": 1, "plug_id": 1, "type": "parking_space"},
-        {"id": 2, "sensor_id": 2, "plug_id": 2, "type": "parking_space"}
+        {"_id": ObjectId("66910b3ad9534f539c120903"), "alias": 1, "parkingSensor": ObjectId("66910af0cd4ecc530d0c9bc8"), "smartPlug": ObjectId("66910b1fa74174b0d5475cd2")},
+        {"_id": ObjectId("66910b4184d0ade72f24d174"), "alias": 2, "parkingSensor": ObjectId("66910b021e707ca140dbaecf"), "smartPlug": ObjectId("66910b2657f3885d66106594")}
     ]
+    parkingSpaceCollection = db["parkingspaces"]
+    parkingSpaceCollection.delete_many({})
+    parkingSpaceCollection.insert_many(parking_spaces)
 
     # Insert Cars
     cars = [
-        {"license_plate": "ETRON1", "manufacturer": "Audi", "model": "Etron", "battery_capacity": 95,
-         "parking_space_id": 1, "type": "car"},
-        {"license_plate": "FUNCY1", "manufacturer": "Ora", "model": "Funcycat", "battery_capacity": 47,
-         "parking_space_id": 2, "type": "car"}
+        {"licensePlate": "F-UN-404", "manufacturer": "Audi", "model": "Etron", "batteryCapacity": 95,
+         "parkingSpace": ObjectId("66910b3ad9534f539c120903")},
+        {"licensePlate": "BI-ER-200", "manufacturer": "Ora", "model": "Funcycat", "batteryCapacity": 47,
+         "parkingSpace": ObjectId("66910b4184d0ade72f24d174")}
     ]
+    carCollection = db["cars"]
+    carCollection.delete_many({})
+    carCollection.insert_many(cars)
 
-    # Insert all documents into the collection
-    device_collection.insert_many(sensors + plugs + parking_spaces + cars)
     print("Entities initialized successfully in MongoDB.")
 
 
