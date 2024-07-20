@@ -1,20 +1,25 @@
 import json
 import os
 import subprocess
+from time import timezone
 import paho.mqtt.client as mqtt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
 
 MQTT_BROKER = "167.172.166.109"
 MQTT_PORT = 1883
 MQTT_USER = "local"
 MQTT_PASSWORD = "Stuttgart"
 MQTT_TOPIC = "/standardized/plan/created"
+DOMAIN_FILE_PATH = "C:\\Users\\I518184\\SmartCities\\DecisionMaking\\domain.pddl"
+PROBLEM_FILE_PATH = "C:\\Users\\I518184\\SmartCities\\DecisionMaking\\problem.pddl"
+
 
 def extract_prices_from_json(data):
     prices = {}
     for entry in data:
-        timestamp = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00")).strftime('%H%M')
-        scaled_price = int(entry["price"] * 1000) 
+        timestamp = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00")).strftime('%d%H%M')
+        scaled_price = int(entry["price"] * 1000)
         prices[timestamp] = {
             "price": scaled_price,
             "timestamp": entry["timestamp"]
@@ -23,11 +28,9 @@ def extract_prices_from_json(data):
 
 
 def round_to_nearest_5_minutes(dt):
-    discard = timedelta(minutes=dt.minute % 5,
-                        seconds=dt.second,
-                        microseconds=dt.microsecond)
-    dt -= discard
-    return dt
+    discard = timedelta(minutes=dt.minute % 5, seconds=dt.second, microseconds=dt.microsecond)
+    return dt - discard
+
 
 def extract_cars_from_json(data):
     car_data = data["car"]
@@ -44,36 +47,7 @@ def extract_cars_from_json(data):
     ]
     return cars
 
-
-
-
-def update_pddl_files(prices, cars):
-    domain_template = """
-    (define (domain charging)
-      (:requirements :typing :action-costs)
-    
-      (:types car parkingspot time)
-    
-      (:predicates 
-        (charging ?c - car ?s - parkingspot ?t - time)
-        (time-slot ?t - time)
-        (car-at ?c - car ?s - parkingspot)
-      )
-    
-      (:functions 
-        (total-cost)
-        (cost-of ?t - time)
-      )
-    
-      (:action start-charging
-        :parameters (?c - car ?s - parkingspot ?t - time)
-        :precondition (and (time-slot ?t) (car-at ?c ?s))
-        :effect (and (charging ?c ?s ?t)
-                     (increase (total-cost) (cost-of ?t)))
-      )
-    )
-    """
-    
+def update_problem_file(prices, cars):
     problem_template = """
     (define (problem charging-problem)
       (:domain charging)
@@ -125,45 +99,52 @@ def update_pddl_files(prices, cars):
         parkingspot_id = f"parkingspot{car['parkingSpace']}"
         charging_goals.append(f"(exists (?t - time) (charging {car_id} {parkingspot_id} ?t))")
 
-    domain_path = "C:\\Users\\I518184\\SmartCities\\Decision Making\\domain.pddl"
-    problem_path = "C:\\Users\\I518184\\SmartCities\\Decision Making\\problem.pddl"
-    
-    with open(domain_path, "w") as domain_file:
-        domain_file.write(domain_template)
-    
-    with open(problem_path, "w") as problem_file:
-        problem_file.write(problem_template.format(
-            car_objects=car_objects,
-            parkingspot_objects=parkingspot_objects,
-            time_objects=time_objects,
-            time_slots_init=time_slots_init,
-            car_at_init="\n        ".join(car_at_init),
-            time_costs="\n        ".join(time_costs),
-            charging_goals="\n        ".join(charging_goals)
-        ))
+    new_problem_file_content = problem_template.format(
+        car_objects=car_objects,
+        parkingspot_objects=parkingspot_objects,
+        time_objects=time_objects,
+        time_slots_init=time_slots_init,
+        car_at_init="\n        ".join(car_at_init),
+        time_costs="\n        ".join(time_costs),
+        charging_goals="\n        ".join(charging_goals)
+    )
+
+    if os.path.exists(PROBLEM_FILE_PATH):
+        with open(PROBLEM_FILE_PATH, "r") as problem_file:
+            current_content = problem_file.read()
+        if current_content == new_problem_file_content:
+            return
+
+    with open(PROBLEM_FILE_PATH, "w") as problem_file:
+        problem_file.write(new_problem_file_content)
 
 
 def get_time_slots_until(deadline):
     deadline_time = datetime.fromisoformat(deadline)
-    current_date = datetime.now().date()
     slots = []
-    for hour in range(24):
-        for minute in range(0, 60, 5):
-
-            slot_time = datetime.strptime(f"{hour:02}:{minute:02}", "%H:%M").replace(tzinfo=deadline_time.tzinfo)
-            slot_time = datetime.combine(current_date, slot_time.time(), slot_time.tzinfo)
-
-            if slot_time <= deadline_time:
-                slots.append(f"{hour:02}{minute:02}")
+    current_time = datetime.now(tz=timezone.utc).replace(second=0, microsecond=0)
+    
+    if current_time.minute % 5 != 0:
+        current_time = round_to_nearest_5_minutes(current_time + timedelta(minutes=5))
+    
+    while current_time <= deadline_time:
+        slots.append(current_time.strftime('%d%H%M'))
+        current_time += timedelta(minutes=5)
+        
+        if current_time.time() == datetime.min.time():
+            current_time = current_time.replace(second=0, microsecond=0)
+    
     return slots
 
 
 def remove_used_time_slots(prices, used_slots):
     for slot in used_slots:
-        timestamp_key = datetime.fromisoformat(slot.replace("Z", "+00:00")).strftime('%H%M')
+        timestamp_key = datetime.fromisoformat(slot.replace("Z", "+00:00")).strftime('%d%H%M')
         if timestamp_key in prices:
             del prices[timestamp_key]
     return prices
+
+
 
 def combine_consecutive_slots(actions):
     if not actions:
@@ -189,7 +170,6 @@ def combine_consecutive_slots(actions):
             start_time = action_time
             end_time = start_time
 
-
     combined_actions.append({
         "action": current_action["action"],
         "car": current_action["car"],
@@ -199,8 +179,7 @@ def combine_consecutive_slots(actions):
 
     return combined_actions
 
-
-def run_planner(domain_file, problem_file, prices, car_id, required_cycles, parking_space, deadline):
+def run_planner(prices, car_id, required_cycles, parking_space, deadline):
     planner_path = 'C:\\Planner\\downward-main\\downward-main\\fast-downward.py'
     used_slots = []
     all_plans = []
@@ -209,7 +188,7 @@ def run_planner(domain_file, problem_file, prices, car_id, required_cycles, park
         command = [
             'python', planner_path,
             '--alias', 'seq-sat-lama-2011',
-            domain_file, problem_file
+            DOMAIN_FILE_PATH, PROBLEM_FILE_PATH
         ]
 
         result = subprocess.run(command, capture_output=True, text=True)
@@ -228,14 +207,12 @@ def run_planner(domain_file, problem_file, prices, car_id, required_cycles, park
             })
             used_slots.append(prices[sorted_plan['time']]['timestamp'])
             prices = remove_used_time_slots(prices, used_slots)
-            update_pddl_files(prices, [{'id': car_id, 'required_time': 1, 'deadline': deadline, 'parkingSpace': parking_space}])
+            update_problem_file(prices, [{'id': car_id, 'required_time': 1, 'deadline': deadline, 'parkingSpace': parking_space}])
         else:
             print("Planner Error:\n", result.stderr)
             break
 
     return all_plans
-
-
 
 def parse_plan(plan_str):
     plan = []
@@ -254,7 +231,6 @@ def parse_plan(plan_str):
                     "time": time.replace('t', '')  
                 })
     return plan
-
 
 def transform_plan_to_json(plans, prices):
     transformed_plan = []
@@ -281,8 +257,6 @@ def transform_plan_to_json(plans, prices):
 
     return transformed_plan
 
-
-
 def publish_plan_to_mqtt(plan):
     client = mqtt.Client()
     client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
@@ -292,22 +266,17 @@ def publish_plan_to_mqtt(plan):
     client.loop_stop()
     client.disconnect()
 
-
-
 def start_execution(data):
     prices = extract_prices_from_json(data["prices"])
     cars = extract_cars_from_json(data)
     all_plans = []
     if prices:
         for car in cars:
-            update_pddl_files(prices, [car])
-            domain_file = 'C:\\Users\\I518184\\SmartCities\\Decision Making\\domain.pddl'
-            problem_file = 'C:\\Users\\I518184\\SmartCities\\Decision Making\\problem.pddl'
-            car_plans = run_planner(domain_file, problem_file, prices, car['id'], car['required_time'], car['parkingSpace'], car['deadline'])
+            update_problem_file(prices, [car])
+            car_plans = run_planner(prices, car['id'], car['required_time'], car['parkingSpace'], car['deadline'])
             all_plans.extend(car_plans)
     transformed_plan = transform_plan_to_json(all_plans, prices)
     publish_plan_to_mqtt(transformed_plan)
-
 
 def on_connect(client, userdata, flags, rc):
     print(f"Connected to MQTT broker with result code {rc}")
@@ -318,7 +287,6 @@ def on_message(client, userdata, msg):
     if msg.topic == "/standardized/plan/create":
         data = json.loads(msg.payload.decode('utf-8'))["data"]
         start_execution(data)
-
 
 if __name__ == "__main__":
     client = mqtt.Client()
