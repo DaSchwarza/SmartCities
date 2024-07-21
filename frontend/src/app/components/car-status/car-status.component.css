@@ -1,0 +1,64 @@
+.car-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: #dcf3ff;
+  border-radius: 8px;
+  margin-top: 50px;
+}
+
+.info h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.status label {
+  display: flex;
+  align-items: center;
+  margin-right: 20px; /* Space between labels */
+  cursor: default !important; /* Non-interactive cursor as they are not clickable */
+}
+
+.status input[type="radio"] {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #ccc;
+  appearance: none;
+  outline: none;
+  cursor: pointer;
+  margin-right: 5px;
+  background-color: #fff;
+}
+
+.status input[type="radio"]:checked {
+  background-color: #7cb05b;
+  border-color: #ffffff00;
+}
+
+.status input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 0px;
+  height: 0px;
+  border-radius: 50%;
+  background-color: #fff;
+}
+
+.car-status button {
+  margin-right: 10px;
+  padding: 10px 20px;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.car-status button.primary {
+  background-color: #a6adb4;
+}

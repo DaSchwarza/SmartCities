@@ -1,0 +1,14 @@
+<div class="timeline">
+    <div class="row">
+        <h3>Charging Timeline</h3>
+        <p>The timeline shows the current plan for the car.<br>
+            If you need to start charging immediatelly, press emergency charging.<br>
+            Please input the current power level for better planning!</p>
+    </div>
+    <div class="row">
+        <div class="chart-container" style="position: relative; width:80%">
+            <canvas baseChart [datasets]="lineChartData" [options]="lineChartOptions" [type]="lineChartType">
+            </canvas>
+        </div>
+    </div>
+</div>

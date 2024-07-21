@@ -1,0 +1,38 @@
+.actions button {
+    margin-right: 10px;
+    padding: 10px 20px;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+.actions button.primary {
+    background-color: #4ea3fd;
+}
+
+.actions button.secondary {
+    background-color: #fd4e4e;
+    color: #333;
+}
+  
+.actions button:hover {
+    background-color: #8d8d8d;
+}
+
+.action-holder {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+}
+
+/* Hide the spinner from input type number */
+.no-spinners::-webkit-inner-spin-button, 
+.no-spinners::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+
+.no-spinners {
+    -moz-appearance: textfield; /* Firefox */
+}

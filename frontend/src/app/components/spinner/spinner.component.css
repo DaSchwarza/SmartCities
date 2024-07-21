@@ -1,0 +1,31 @@
+/* Container for the spinner that ensures it is centered within its parent */
+.spinner-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%; /* Adjust the height as necessary depending on your layout */
+  
+    border: 4px solid rgba(0, 0, 0, 0.1); /* Light gray border for aesthetics */
+    border-left-color: #196da5; /* Colorful part of the spinner */
+    border-radius: 50%;
+    width: 30px;  /* Size of the spinner */
+    height: 30px; /* Size of the spinner */
+    animation: spin 1s linear infinite;
+}
+
+.spinner-holder {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 50px; /* Or whatever height you find suitable */
+}
+  
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  

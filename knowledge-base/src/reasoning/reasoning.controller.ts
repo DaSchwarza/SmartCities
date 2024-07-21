@@ -10,7 +10,12 @@ export class ReasoningController {
     ) {}
 
     @Post('emergency-charge')
-    create(@Body() data: {_id: string}) {
+    emergencyCharge(@Body() data: {_id: string}) {
       return this.reasoningService.emergencyCharge(data._id);
+    }
+
+    @Post('changeStartSoC')
+    changeStartSoC(@Body() data: { _id: string, startSoC: number  }) {
+      return this.reasoningService.newStartSoC(data._id, data.startSoC)
     }
 }

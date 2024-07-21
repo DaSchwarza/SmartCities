@@ -1,0 +1,13 @@
+<form (submit)="changeStartSoc(startSoc)">
+    <div class="action-holder actions">
+        <div class="input group">
+            <label for="startSoc">Start SoC (%):</label>
+            <input type="number" id="startSoc" name="startSoc"
+                [(ngModel)]="startSoc" min="0" max="100" step="1" class="no-spinners">
+            <button type="submit" class="secondary">Set Start SoC</button>
+        </div>
+        <div>
+            <button type="button" class="secondary" (click)="emergencyCharge()">Emergency Charging</button>
+        </div>
+    </div>
+</form>

@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 
 mongo_uri = os.getenv('MONGO_URI')
 
+linkBier = "https://calendar.google.com/calendar/u/0?cid=ODgyNDRlMjZhNzQxM2RlMWNjODk0ODRiNzgzYTgwNjE1M2JiYjZkNDRmOWVlNDM2MDQ4OGY0MDg0OTMzMzQ5OUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t"
+linkFun="https://calendar.google.com/calendar/u/0?cid=YW1hbmRhLWhlaW1Ad2ViLmRl"
 
 def initialize_configurations():
     # Load environment variables
@@ -61,8 +63,8 @@ def initialize_entities():
 
     # Insert Parking Spaces
     parking_spaces = [
-        {"_id": ObjectId("66910b3ad9534f539c120903"), "alias": 1, "parkingSensor": ObjectId("66910af0cd4ecc530d0c9bc8"), "smartPlug": ObjectId("66910b1fa74174b0d5475cd2")},
-        {"_id": ObjectId("66910b4184d0ade72f24d174"), "alias": 2, "parkingSensor": ObjectId("66910b021e707ca140dbaecf"), "smartPlug": ObjectId("66910b2657f3885d66106594")}
+        {"_id": ObjectId("66910b3ad9534f539c120903"), "alias": 1, "parkingSensor": ObjectId("66910af0cd4ecc530d0c9bc8"), "smartPlug": ObjectId("66910b2657f3885d66106594")},
+        {"_id": ObjectId("66910b4184d0ade72f24d174"), "alias": 2, "parkingSensor": ObjectId("66910b021e707ca140dbaecf"), "smartPlug": ObjectId("66910b1fa74174b0d5475cd2")}
     ]
     parkingSpaceCollection = db["parkingspaces"]
     parkingSpaceCollection.delete_many({})
@@ -70,10 +72,10 @@ def initialize_entities():
 
     # Insert Cars
     cars = [
-        {"licensePlate": "F-UN-404", "manufacturer": "Audi", "model": "Etron", "batteryCapacity": 95,
-         "parkingSpace": ObjectId("66910b3ad9534f539c120903")},
-        {"licensePlate": "BI-ER-200", "manufacturer": "Ora", "model": "Funcycat", "batteryCapacity": 47,
-         "parkingSpace": ObjectId("66910b4184d0ade72f24d174")}
+        {"licensePlate": "F-UN-404", "manufacturer": "VW", "model": "ID3", "batteryCapacity": 40,
+         "parkingSpace": ObjectId("66910b3ad9534f539c120903", "calendarLink": linkFun)},
+        {"licensePlate": "BI-ER-200", "manufacturer": "Ora", "model": "Funcycat", "batteryCapacity": 35,
+         "parkingSpace": ObjectId("66910b4184d0ade72f24d174", "calendarLink": linkBier)}
     ]
     carCollection = db["cars"]
     carCollection.delete_many({})

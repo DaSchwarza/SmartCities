@@ -1,0 +1,13 @@
+<div style="margin-left: 10%; margin-right: 10%">
+  <div *ngFor="let car of cars">
+    <app-car-status [car]="car"></app-car-status>
+    <div *ngIf="car.timelineEntries && car.timelineEntries.length">
+      <app-charging-timeline [timelineData]="car.timelineEntries"></app-charging-timeline>
+    </div>
+    <div *ngIf="car.planGenerating">
+      <app-spinner></app-spinner>
+    </div>
+    <app-car-action [car]="car"></app-car-action>
+  </div>
+  <app-energy-price-chart></app-energy-price-chart>
+</div>
