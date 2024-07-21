@@ -31,12 +31,13 @@ export class ReasoningService {
     
             // generate new plan if car arrived or system started
             if (
-                previousOccupation == undefined ||
-                (previousOccupation == false && occupied == true)
+                occupied &&
+                (previousOccupation == false || previousOccupation == undefined)
             ) {
                 this.logger.log(`[${parkingSpaceId}] Car arrived`);
                 return this.generateContext(car);
             }
+            // ToDo set startSoc to 20 when car left
             this.logger.log(`[${parkingSpaceId}] Car left`);
         } catch (error) {
             this.logger.error(`[${parkingSpaceId}] Error during parking occupation update: ${error}`);
@@ -71,7 +72,10 @@ export class ReasoningService {
         if (!car.charging && power > 0) {
             car.charging = true;
             car.chargingSince = new Date();
-        } else if (power >= 0) {
+            return this.carService.update(car._id.toString(), car);
+        }
+        
+        if (power <= 0) {
             // charging is still enabled but stopped
             if (car.charging && car.chargingEnabled) {
                 this.logger.error(`[${car.parkingSpace.alias}] Car was unplugged while charging was enabled`);
@@ -92,7 +96,18 @@ export class ReasoningService {
 
         // update car
         car.chargingPlan = plan;
+        car.planGenerating = false;
         this.carService.update(car._id.toString(), car);
+    }
+
+    async newStartSoC(carId: string, startSoC: number) {
+        this.logger.log(`[${carId}] New start SOC: ${startSoC}`);
+
+        const car = await this.carService.findOne(carId)
+        car.startSoC = startSoC
+        this.carService.update(carId, car)
+        // start reasoning since startSoC changed
+        this.generateContext(car)
     }
 
     async newUpcomingEvents(licensePlate: string, events: {start: Date, end: Date}[]) {
@@ -120,16 +135,19 @@ export class ReasoningService {
         this.logger.log(`[${licensePlate}] New departure time: ${departureTime}`);
         
         // check if departure time changed
-        if (car.departureTime == departureTime) {
+        if (new Date(car.departureTime).toUTCString() === new Date(departureTime).toUTCString()) {
             return;
         }
 
         // update car
         car.departureTime = departureTime;
+        car.calendarEntries = events;
         this.carService.update(car._id.toString(), car);
 
-        // generate new plan if departure time changed
-        this.generateContext(car);
+        // generate new plan if departure time changed and car is there
+        if (car.isParked) {
+            this.generateContext(car);
+        }
     }
 
     async checkCharging(car: Car, power: number) {
@@ -152,7 +170,9 @@ export class ReasoningService {
 
         const prices = await this.priceService.getTodaysPrices();
         // plug maximum is 4kW, interval is 5min, start Soc is 20%, target is 80%
-        const required_cycles = Math.ceil(((0.1 * car.batteryCapacity) / 4) * 12)
+        const currentSoC = car.startSoC ? car.startSoC : 20
+        const chargePercent = (80 - currentSoC) / 100
+        const required_cycles = Math.ceil(((chargePercent * car.batteryCapacity) / 4) * 12)
         const formattedCar = {
             car_id: car.licensePlate,
             required_cycles,
@@ -165,6 +185,10 @@ export class ReasoningService {
         }
         this.logger.log(`[${car.parkingSpace.alias}] Generated new context: ${JSON.stringify(formattedCar)}`);
         this.connectorService.publishToBroker('/standardized/plan/create', context);
+
+        car.planGenerating = true
+        car.chargingPlan = undefined
+        this.carService.update(car._id.toString(), car)
     }
 
     async emergencyCharge(carId: string) {
@@ -173,15 +197,16 @@ export class ReasoningService {
 
         // update car
         car.emergencyCharging = true;
+        car.planGenerating = true;
         this.carService.update(car._id.toString(), car);
 
         const prices = await this.priceService.getTodaysPrices();
-        console.log(prices);
+        // buikd in startSoc
         // plug maximum is 4kW, interval is 5min, start Soc is 20%, target is 80%
-        const required_cycles = Math.ceil(((0.1 * car.batteryCapacity) / 4) * 12)
+        const required_cycles = Math.ceil(((0.6 * car.batteryCapacity) / 4) * 12)
         // set depature time to now + required_cycles
         const deadline = new Date();
-        deadline.setMinutes(deadline.getMinutes() + required_cycles * 5);
+        deadline.setMinutes(deadline.getMinutes() + (required_cycles * 5) - 2);
         // round to next 5min slot
         const minutesToAdd = (5 - (deadline.getMinutes() % 5) % 5);
         deadline.setMinutes(deadline.getMinutes() + minutesToAdd, 0, 0);

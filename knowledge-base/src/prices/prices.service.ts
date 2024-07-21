@@ -14,8 +14,8 @@ export class PricesService {
     async getTodaysPrices(): Promise<DynamicPrice[]> {
         const date = new Date();
         const minutes = date.getMinutes();
-        const next5MinSlot = 5 * Math.ceil(minutes / 5);
-        date.setMinutes(next5MinSlot, 0, 0);
+        const last5MinSlot = 5 * Math.floor(minutes / 5);
+        date.setMinutes(last5MinSlot, 0, 0);
 
         this.logger.log(`Fetching dynamic prices from ${date}`);
         const query = {

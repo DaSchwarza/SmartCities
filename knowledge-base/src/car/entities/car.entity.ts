@@ -30,7 +30,10 @@ export class Car {
   batteryCapacity: number;
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: ParkingSpace.name, required: true})
   parkingSpace: ParkingSpace;
+  @Prop({ required: true })
+  calendarLink: string;
 
+  
   // Reasoning attributes
   @Prop()
   isParked?: boolean;
@@ -58,6 +61,10 @@ export class Car {
   startSoC?: number;
   @Prop()
   emergencyCharging?: boolean;
+  @Prop({ type: Object })
+  calendarEntries: any
+  @Prop()
+  planGenerating: boolean
 }
 
 export const CarSchema = SchemaFactory.createForClass(Car);

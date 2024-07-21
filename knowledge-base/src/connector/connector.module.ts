@@ -19,8 +19,8 @@ import { OutboundResponseSerializer } from './serializer';
           transport: Transport.MQTT,
           options: {
             url: `mqtt://${configService.get('MQTT_BROKER')}:${configService.get('MQTT_PORT')}`,
-            username: configService.get('MQTT_USER'),
-            password: configService.get('MQTT_PASSWORD'),
+            username: 'local',
+            password: 'Stuttgart',
             serializer: new OutboundResponseSerializer()
           },
         }),

@@ -1,0 +1,17 @@
+<div class="car-status">
+  <div class="info">
+    <h3>{{ car.licensePlate }}</h3>
+    <p>{{ car.manufacturer }} {{ car.model }}</p>
+  </div>
+  <div>
+    <button class="primary" (click)="referToCalendar()">Calendar</button>
+  </div>
+  <div class="status">
+    <label>
+      <input type="radio" [checked]="car.isParked" disabled> Car Present
+    </label>
+    <label>
+      <input type="radio" [checked]="car.charging" disabled> Car Charging
+    </label>
+  </div>
+</div>

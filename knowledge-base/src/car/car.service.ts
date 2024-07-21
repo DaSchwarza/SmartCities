@@ -145,7 +145,10 @@ export class CarService {
         departureTime: "",
         carNotPluggedIn: "",
         carUnpluggedEarly: "",
-        emergencyCharging: ""
+        emergencyCharging: "",
+        calendarEntries: "",
+        planGenerating: "",
+        startSoC: ""
       }
     });
   }

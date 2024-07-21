@@ -43,10 +43,9 @@ def save_prices_to_mongodb(data):
         for minute in range(0, 60, 5):  # Generating entries for every 5 minutes
             timestamp = base_time + timedelta(minutes=minute)
             # convert price to EUR / KWH and add flat grid fees
-            kwh_price = price / 1000 + 0.2
-            formatted_timestamp = timestamp.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            kwh_price = round(price / 1000 + 0.2, 4)
             price_document = {
-                "timestamp":formatted_timestamp,
+                "timestamp":timestamp,
                 "price": kwh_price
             }
             collection.insert_one(price_document)

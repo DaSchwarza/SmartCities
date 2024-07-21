@@ -9,6 +9,7 @@ async function bootstrap() {
 
   app.useGlobalPipes(new ValidationPipe());
   app.useLogger(app.get(Logger));
+  app.enableCors();
   
   const configService: ConfigService = app.get(ConfigService);
 
@@ -18,8 +19,8 @@ async function bootstrap() {
       transport: Transport.MQTT,
       options: {
         url: `mqtt://${configService.get("MQTT_BROKER")}:${configService.get("MQTT_PORT")}`,
-        username: configService.get("MQTT_USER"),
-        password: configService.get("MQTT_PASSWORD"),
+        username: 'local',
+        password: 'Stuttgart',
       },
     }, {
       inheritAppConfig: true,
