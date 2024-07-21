@@ -5,19 +5,21 @@ from time import timezone
 import paho.mqtt.client as mqtt
 from datetime import datetime, timedelta, timezone
 
-
+# MQTT-Konfigurationsparameter
 MQTT_BROKER = "167.172.166.109"
 MQTT_PORT = 1883
 MQTT_USER = "local"
 MQTT_PASSWORD = "Stuttgart"
 MQTT_TOPIC = "/standardized/plan/created"
+
+# Dateipfade für die Problem- und Domain-Dateien
 DOMAIN_FILE_PATH = "C:\\Users\\I518184\\SmartCities\\DecisionMaking\\domain.pddl"
 PROBLEM_FILE_PATH = "C:\\Users\\I518184\\SmartCities\\DecisionMaking\\problem.pddl"
 
-
-def extract_prices_from_json(data):
+def extract_prices_from_json(data): #Extrahiert Preise aus JSON-Daten und skaliert sie, die Preise werden in einem Dictionary mit Zeitstempeln als Schlüsseln gespeichert
     prices = {}
     for entry in data:
+        # Konvertiere den Zeitstempel und skaliere den Preis
         timestamp = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00")).strftime('%d%H%M')
         scaled_price = int(entry["price"] * 1000)
         prices[timestamp] = {
@@ -26,13 +28,11 @@ def extract_prices_from_json(data):
         }
     return prices
 
-
-def round_to_nearest_5_minutes(dt):
+def round_to_nearest_5_minutes(dt): #Rundet einen gegebenen Zeitpunkt auf die nächsten 5 Minuten ab
     discard = timedelta(minutes=dt.minute % 5, seconds=dt.second, microseconds=dt.microsecond)
     return dt - discard
 
-
-def extract_cars_from_json(data):
+def extract_cars_from_json(data): #Extrahiert Autodaten aus JSON-Daten und passt den Abgabetermin an
     car_data = data["car"]
     deadline = datetime.fromisoformat(car_data["deadline"].replace("Z", "+00:00"))
     adjusted_deadline = deadline - timedelta(minutes=5)
@@ -47,7 +47,7 @@ def extract_cars_from_json(data):
     ]
     return cars
 
-def update_problem_file(prices, cars):
+def update_problem_file(prices, cars): #Aktualisiert die Problemdatei mit den aktuellen Preisen und Autodaten.
     problem_template = """
     (define (problem charging-problem)
       (:domain charging)
@@ -72,6 +72,7 @@ def update_problem_file(prices, cars):
     )
     """
     
+    # Erzeuge die benötigten Objekte und Initialisierungen
     car_objects = " ".join(car['id'] for car in cars)
     parkingspot_objects = " ".join(f"parkingspot{car['parkingSpace']}" for car in cars)
     
@@ -109,6 +110,7 @@ def update_problem_file(prices, cars):
         charging_goals="\n        ".join(charging_goals)
     )
 
+    # Vergleiche den Inhalt der Datei mit der neuen Version und schreibe, falls notwendig
     if os.path.exists(PROBLEM_FILE_PATH):
         with open(PROBLEM_FILE_PATH, "r") as problem_file:
             current_content = problem_file.read()
@@ -118,35 +120,27 @@ def update_problem_file(prices, cars):
     with open(PROBLEM_FILE_PATH, "w") as problem_file:
         problem_file.write(new_problem_file_content)
 
-
-def get_time_slots_until(deadline):
+def get_time_slots_until(deadline): #Generiert alle Zeitslots bis zur angegebenen Deadline.
     deadline_time = datetime.fromisoformat(deadline)
     slots = []
     current_time = datetime.now(tz=timezone.utc).replace(second=0, microsecond=0)
     
-    if current_time.minute % 5 != 0:
-        current_time = round_to_nearest_5_minutes(current_time + timedelta(minutes=5))
+    current_time = round_to_nearest_5_minutes(current_time)
     
     while current_time <= deadline_time:
         slots.append(current_time.strftime('%d%H%M'))
         current_time += timedelta(minutes=5)
-        
-        if current_time.time() == datetime.min.time():
-            current_time = current_time.replace(second=0, microsecond=0)
     
     return slots
 
-
-def remove_used_time_slots(prices, used_slots):
+def remove_used_time_slots(prices, used_slots): #Entfernt genutzte Zeitslots aus den Preisdaten
     for slot in used_slots:
         timestamp_key = datetime.fromisoformat(slot.replace("Z", "+00:00")).strftime('%d%H%M')
         if timestamp_key in prices:
             del prices[timestamp_key]
     return prices
 
-
-
-def combine_consecutive_slots(actions):
+def combine_consecutive_slots(actions): #Kombiniert aufeinanderfolgende Ladeaktionen zu längeren Zeitintervallen
     if not actions:
         return []
 
@@ -179,7 +173,7 @@ def combine_consecutive_slots(actions):
 
     return combined_actions
 
-def run_planner(prices, car_id, required_cycles, parking_space, deadline):
+def run_planner(prices, car_id, required_cycles, parking_space, deadline): #Führt den Planer aus und generiert Ladepläne für das Auto.
     planner_path = 'C:\\Planner\\downward-main\\downward-main\\fast-downward.py'
     used_slots = []
     all_plans = []
@@ -214,7 +208,7 @@ def run_planner(prices, car_id, required_cycles, parking_space, deadline):
 
     return all_plans
 
-def parse_plan(plan_str):
+def parse_plan(plan_str): #Parst den Planergebnis-String und extrahiert die Aktionen
     plan = []
     for line in plan_str.strip().split("\n"):
         parts = line.split()
@@ -232,7 +226,7 @@ def parse_plan(plan_str):
                 })
     return plan
 
-def transform_plan_to_json(plans, prices):
+def transform_plan_to_json(plans, prices): #Transformiert den Ladeplan in ein JSON-Format, kombiniert Aktionen und sortiert nach Zeiten
     transformed_plan = []
     parking_spaces = {}
 
@@ -257,7 +251,7 @@ def transform_plan_to_json(plans, prices):
 
     return transformed_plan
 
-def publish_plan_to_mqtt(plan):
+def publish_plan_to_mqtt(plan): #Veröffentlicht den Ladeplan über MQTT
     client = mqtt.Client()
     client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
@@ -266,7 +260,7 @@ def publish_plan_to_mqtt(plan):
     client.loop_stop()
     client.disconnect()
 
-def start_execution(data):
+def start_execution(data): #Startet die Ausführung des gesamten Prozesses: Extraktion, Planung und Veröffentlichung des Ladeplans
     prices = extract_prices_from_json(data["prices"])
     cars = extract_cars_from_json(data)
     all_plans = []
@@ -278,17 +272,17 @@ def start_execution(data):
     transformed_plan = transform_plan_to_json(all_plans, prices)
     publish_plan_to_mqtt(transformed_plan)
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc): #Callback-Funktion für die Verbindung zum MQTT-Broker.
     print(f"Connected to MQTT broker with result code {rc}")
     client.subscribe("/standardized/plan/create")
 
-def on_message(client, userdata, msg):
+def on_message(client, userdata, msg): #Callback-Funktion für empfangene MQTT-Nachrichten
     print(f"Message received: {msg.topic} {msg.payload}")
     if msg.topic == "/standardized/plan/create":
         data = json.loads(msg.payload.decode('utf-8'))["data"]
         start_execution(data)
 
-if __name__ == "__main__":
+if __name__ == "__main__": #Initialisierung des MQTT-Clients und Starten der Endlosschleife
     client = mqtt.Client()
     client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
     client.on_connect = on_connect
